@@ -31,7 +31,7 @@ class NN(nn.Module):
         return torch.flatten(x, 1)
     
     def forward(self, x):
-        x = self.flatten(x)
+        #x = self.flatten(x)
         x = self.layer(x)
         return x
 
@@ -115,6 +115,7 @@ class NNAgent:
         self.load_model(weight)
         self.update_target_model()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.loss_func = nn.CrossEntropyLoss()
 
         self.boards = []
         self.actions = []
@@ -143,9 +144,11 @@ class NNAgent:
     def get_pos(self, board):
         pos = self.choose_action(board)
         arg = pos[0] * board.cols + pos[1]
+        
         self.boards.append(board.boardRaw)
-        action = np.zeros(self.action_size)
+        action = torch.zeros(self.action_size, dtype=torch.float32)
         action[arg] = 1
+        self.actions.append(action)
 
         return pos        
     
@@ -153,17 +156,21 @@ class NNAgent:
         length = len(self.boards)
         for i in range(length):
             x = self.boards[i]
-            action = self.actions[length - i]
+            action = self.actions[length - i - 1]
 
-            x = self.preprocess(self.boards[i])
-            y = torch.tensor(action * score)
-            score *= self.disount_factor
+            x = self.preprocessX(self.boards[i])
+            y = action * score
+            score *= self.discount_factor
 
             self.model.train()
             self.optimizer.zero_grad()
             predict = self.target_model(x)
-            predict = np.multiply(predict, action)
-            loss = nn.CrossEntropyLoss(predict, y)
+            predict = torch.multiply(predict, action)
+
+            predict = predict.reshape((1, len(predict)))
+            y = y.reshape((1, len(y)))
+
+            loss = self.loss_func(predict, y)
             loss.backward()
             self.optimizer.step()
         
@@ -181,7 +188,7 @@ class NNAgent:
                     boardNum[i * cols + j] = 1
                 elif not boardRaw[i][j] == '.':
                     boardNum[i * cols + j] = 2
-        return torch.tensor(boardNum)
+        return torch.tensor(boardNum, dtype=torch.float32)
 
 
 

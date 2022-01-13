@@ -134,11 +134,15 @@ class Game:
             pygame.quit()
         
         if self.player['W'].isAI:
+            if self.gameWin and self.turn == 'W':
+                self.player['W'].train(1000)
+            elif self.gameWin and self.turn == 'B':
+                self.player['W'].train(-1000)
             return self.player['W'].save_model()
 
 if __name__ == "__main__":
     for i in range(10000):
-        if i % 1000 == 0:
+        if i % 100 == 0:
             print("Training step", i)
         game = Game(False)
         game.setPlayers(True, True, weight)
