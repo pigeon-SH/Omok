@@ -2,16 +2,22 @@
 #If there's no where to putdown but game is not Win-state
 
 import pygame
-from newAgent import Agent
-from board import Board
+from Agent import Agent
+from Agent import Minimax
+from Agent import NNAgent
+from Board import Board
+from Agent import NN
+
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 COLOR = {'B': BLACK, 'W': WHITE}
+network = NN(225, 225)
+weight = network.state_dict()
 
 class Game:
-    def __init__(self):
-        self.player = None
+    def __init__(self, needpygame):
+        self.player = {}
         self.turn = 'B' # start turn: B
         self.board = Board()
         self.backgroundColor = WHITE
@@ -26,13 +32,21 @@ class Game:
         self.gameQuit = False
         self.gameWin = False
         self.gameTie = False
+
+        self.needPygame = needpygame
         
-    def setPlayers(self):
-        # set players
-        print("AI: Enter A / Player: Enter P")
-        player_B = input("Black Player:")
-        player_W = input("White Player:")
-        self.player = {'B': Agent('B', (player_B == 'A')), 'W': Agent('W', (player_W == 'A'))}
+    def setPlayers(self, isAI_B, isAI_W, weight):
+        if isAI_B:
+            boardsize = self.board.rows * self.board.cols
+            self.player['B'] = NNAgent('B', True, boardsize, boardsize, weight)
+        else:
+            self.player['B'] = Agent('B', False)
+        
+        if isAI_W:
+            boardsize = self.board.rows * self.board.cols
+            self.player['W'] = NNAgent('W', True, boardsize, boardsize, weight)
+        else:
+            self.player['W'] = Agent('W', False)
     
     def drawBoard(self):
         endpoint = [self.margin[0] + self.boxSize[0] * (self.board.rows - 1), self.margin[1] + self.boxSize[1] * (self.board.cols - 1)]
@@ -54,13 +68,14 @@ class Game:
             self.gameTie = True
             return
         if self.board.putdown(boardpos, self.turn): #if can putdown
-            pygame.draw.circle(self.screen, COLOR[self.turn], windowpos, self.radius)
+            if self.needPygame:
+                pygame.draw.circle(self.screen, COLOR[self.turn], windowpos, self.radius)
             if self.board.check_win(boardpos, self.turn):
                 self.gameWin = True
                 return
             self.turnover()
         else:
-            print("You cannot put down here.")
+            print("You cannot put down here. Turn:", self.turn, "pos:", self.boardpos)
             #else: not turnover
     
     def window_to_board(self, windowpos):
@@ -85,34 +100,50 @@ class Game:
                         return windowpos, boardpos
                     elif event.type == pygame.QUIT:
                         self.gameQuit = True
-                        pygame.quit
                         return None, None
 
     
     def start(self):
-        self.setPlayers()
-        pygame.init()
-        pygame.font.init()
+        if self.needPygame:
+            #self.setPlayers()
+            pygame.init()
+            pygame.font.init()
 
-        pygame.display.set_caption("Omok")
-        self.screen = pygame.display.set_mode((self.windowSize[1], self.windowSize[0])) # set_mode((width, height))
-        self.screen.fill(self.backgroundColor)
+            pygame.display.set_caption("Omok")
+            self.screen = pygame.display.set_mode((self.windowSize[1], self.windowSize[0])) # set_mode((width, height))
+            self.screen.fill(self.backgroundColor)
 
-        self.drawBoard()
+            self.drawBoard()
 
         while not(self.gameWin or self.gameQuit or self.gameTie):
-            pygame.display.flip()   # draw screen
+            if self.needPygame:
+                pygame.display.flip()   # draw screen
             winpos, boardpos = self.get_pos()
             if winpos != None:
                 self.put_down(winpos, boardpos)
         
-        if self.gameWin:
-            print(self.turn, "is Win!!")
-        elif self.gameQuit:
-            print("Game Quit")
-        elif self.gameTie:
-            print("Tie game")
+        if self.needPygame:
+            if self.gameWin:
+                print(self.turn, "is Win!! blank_cnt:", self.board.blank_cnt)
+            elif self.gameQuit:
+                print("Game Quit")
+            elif self.gameTie:
+                print("Tie game")
+
+        if self.needPygame:
+            pygame.quit()
+        
+        if self.player['W'].isAI:
+            return self.player['W'].save_model()
 
 if __name__ == "__main__":
-    game = Game()
+    for i in range(10000):
+        if i % 1000 == 0:
+            print("Training step", i)
+        game = Game(False)
+        game.setPlayers(True, True, weight)
+        weight = game.start()
+    print("Train Finished")
+    game = Game(True)
+    game.setPlayers(False, True, weight)
     game.start()

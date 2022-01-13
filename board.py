@@ -1,7 +1,6 @@
 import copy
 
 class Board:
-
     def __init__(self):
         self.__black = 'B'
         self.__white = 'W'
@@ -10,6 +9,7 @@ class Board:
         self.rows = 15
         self.cols = 15
         self.boardRaw = [['.' for i in range(self.cols)] for j in range(self.rows)] # boardRaw[rows][cols]
+        self.boardNum = [[0 for i in range(self.cols)] for j in range(self.rows)] # boardRaw[rows][cols]
         self.blank_cnt = self.rows * self.cols
 
     def check_win(self, pos, turn):
@@ -19,8 +19,46 @@ class Board:
         else:
             return False
     
-    def get_score(self, row, col, turn):
-        return self.count_horizontal(row, col, turn) + self.count_vertical(row, col, turn) + self.count_diagonal_LU(row, col, turn) + self.count_diagonal_RU(row, col, turn)
+    def get_score(self, row, col, turn, enemy):
+        ####################################################################
+        #   TODO:                                                          #
+        #   check win method: only have to check nearby of putdown         #
+        #   get score method: have to check entire board                   #
+        #       if my turn is black, check black weight and plus score     #
+        #       if my turn is black, check white weight and minus score    #
+        ####################################################################
+        mycounts = []
+        enemycounts = []
+        mycounts.append(self.count_horizontal(row, col, turn))
+        mycounts.append(self.count_vertical(row, col, turn))
+        mycounts.append(self.count_diagonal_LU(row, col, turn))
+        mycounts.append(self.count_diagonal_RU(row, col, turn))
+        enemycounts.append(self.count_horizontal(row, col, enemy))
+        enemycounts.append(self.count_vertical(row, col, enemy))
+        enemycounts.append(self.count_diagonal_LU(row, col, enemy))
+        enemycounts.append(self.count_diagonal_RU(row, col, enemy))
+
+        score_sum = 0
+        for cnt in mycounts:
+            if cnt >= 5:
+                score_sum += 100000
+            elif cnt >= 4:
+                score_sum += 10000
+            elif cnt >= 3:
+                score_sum += 1000
+            else:
+                score_sum += cnt
+        for cnt in enemycounts:
+            if cnt >= 5:
+                score_sum += 50000
+            elif cnt >= 4:
+                score_sum += 5000
+            elif cnt >= 3:
+                score_sum += 500
+            else:
+                score_sum += cnt
+
+        return score_sum
 
     def count_horizontal(self, row, col, turn):
         cnt = 1 # (x,y) is already == turn
@@ -151,8 +189,9 @@ class Board:
             return False
     
     def deepCopy(self):
-        newBoardRaw = copy.deepcopy(self.boardRaw)
-        return Board(newBoardRaw)
+        newBoard = Board()
+        newBoard.boardRaw = copy.deepcopy(self.boardRaw)
+        return newBoard
     
     def get_legal_pos(self):
         legal_list = []
@@ -164,3 +203,4 @@ class Board:
     
     def check_tie(self):
         return (self.blank_cnt == 0)
+
