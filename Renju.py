@@ -9,15 +9,15 @@ class Player:
     def __init__(self, color, isAI):
         self.isAI = isAI
         if isAI:
-            self.AI = AlphaBeta(15, 15, color)
+            self.AI = AlphaBeta(10, 10, color)
 
 class Game:
-    def __init__(self):
-        self.player = {'B': Player('B', isAI=False), 'W': Player('W', isAI=True)}
+    def __init__(self, B_isAI, W_isAI):
+        self.player = {'B': Player('B', isAI=B_isAI), 'W': Player('W', isAI=W_isAI)}
         self.turn = 'B'
 
-        self.rows = 15
-        self.cols = 15
+        self.rows = 10
+        self.cols = 10
         self.board = [['.' for i in range(self.cols)] for j in range(self.rows)]
         self.blank_cnt=  self.cols * self.rows
         #self.blanks = [[i, j] for i in range(self.rows) for j in range(self.cols)]
@@ -193,6 +193,9 @@ class Game:
                 spot = self.get_spot()
             
             if spot:
+                blanks = self.get_blanks()
+                state = State(copy.deepcopy(self.board), self.rows, self.cols, self.blank_cnt, blanks)
+                print("score:", state.get_score(self.turn))
                 self.checkResult(spot)
                 self.nextTurn()
         
@@ -200,5 +203,5 @@ class Game:
         pygame.quit()
 
 if __name__ == "__main__":
-    game = Game()
+    game = Game(False, True)
     game.start()
