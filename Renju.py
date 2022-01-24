@@ -1,5 +1,6 @@
 import pygame
 from AI import *
+from State import State
 import copy
 import numpy as np
 
@@ -194,10 +195,12 @@ class Game:
                 spot = self.get_spot()
             
             if spot:
+
                 # debug
-                #blanks = self.get_blanks()
-                #state = State(copy.deepcopy(self.board), self.rows, self.cols, self.blank_cnt, blanks, self.turn)
-                #print("score:", state.update_score(spot))
+                blanks = self.get_blanks()
+                state = State(copy.deepcopy(self.board), self.rows, self.cols, self.blank_cnt, blanks, self.turn)
+                print("score:", state.get_score_entire())
+
                 self.checkResult(spot)
                 self.nextTurn()
         
