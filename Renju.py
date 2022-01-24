@@ -1,6 +1,7 @@
 import pygame
 from AI import *
 import copy
+import numpy as np
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -9,7 +10,7 @@ class Player:
     def __init__(self, color, isAI):
         self.isAI = isAI
         if isAI:
-            self.AI = AlphaBeta(10, 10, color)
+            self.AI = AlphaBeta(10, 10)
 
 class Game:
     def __init__(self, B_isAI, W_isAI):
@@ -18,7 +19,7 @@ class Game:
 
         self.rows = 10
         self.cols = 10
-        self.board = [['.' for i in range(self.cols)] for j in range(self.rows)]
+        self.board = np.array([['.' for i in range(self.cols)] for j in range(self.rows)])
         self.blank_cnt=  self.cols * self.rows
         #self.blanks = [[i, j] for i in range(self.rows) for j in range(self.cols)]
 
@@ -129,7 +130,7 @@ class Game:
     def get_spot(self):
         # AI Player
         if self.player[self.turn].isAI:
-            state = State(copy.deepcopy(self.board), self.rows, self.cols, self.blank_cnt, self.get_blanks())
+            state = State(copy.deepcopy(self.board), self.rows, self.cols, self.blank_cnt, self.get_blanks(), self.turn)
             spot = self.player[self.turn].AI.get_spot(state)
             return spot
         
@@ -193,9 +194,10 @@ class Game:
                 spot = self.get_spot()
             
             if spot:
-                blanks = self.get_blanks()
-                state = State(copy.deepcopy(self.board), self.rows, self.cols, self.blank_cnt, blanks)
-                print("score:", state.get_score(self.turn))
+                # debug
+                #blanks = self.get_blanks()
+                #state = State(copy.deepcopy(self.board), self.rows, self.cols, self.blank_cnt, blanks, self.turn)
+                #print("score:", state.update_score(spot))
                 self.checkResult(spot)
                 self.nextTurn()
         

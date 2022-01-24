@@ -3,7 +3,7 @@ import copy
 INFINITY = 100000000
 
 class State:
-    def __init__(self, board, rows, cols, blank_cnt, blanks):
+    def __init__(self, board, rows, cols, blank_cnt, blanks, mine):
         self.board = board
         self.rows = rows
         self.cols = cols
@@ -13,6 +13,9 @@ class State:
 
         self.terminal = False
         self.winner = None
+        self.score = 0
+        self.score_change_stack = []
+        self.mine = mine
     
     def actions(self):
         return self.blanks
@@ -33,6 +36,7 @@ class State:
         self.board[act[0]][act[1]] = player
         self.blank_cnt -= 1
         self.blanks.remove(act)
+        self.update_score(act)
         self.check_terminal(act)
     
     def undo(self, act):
@@ -48,313 +52,82 @@ class State:
         if self.terminal:
             self.terminal = False
             self.winner = ''
+        
+        self.score -= self.score_change_stack[-1]
+        self.score_change_stack.pop(-1)
     
-    def compute_score(self, data, ismine):
-        open_cnt = 0
-        if data[0] == self.__blank:
-            open_cnt += 1
-        if data[-1] == self.__blank:
-            open_cnt += 1
-        
+    def update_score(self, spot):
         score = 0
-        jump_idx = data[1:-1].find(self.__blank)
-        if jump_idx < 0:            # no jump
-            cnt = len(data) - 2
-            if cnt >= 5:            # 오목, 육목
-                score = 100000      # winscore
-            elif cnt >= 4:
-                if open_cnt >= 2:   # 열린사
-                    score = 100000   # winscore
-                elif open_cnt >= 1: # 닫힌사
-                    score = 1000
-            elif cnt >= 3:
-                if open_cnt >= 2:   # 열린삼
-                    score = 1000
-                elif open_cnt >= 1: # 닫힌삼
-                    score = 200
-            elif cnt >= 2:
-                if open_cnt >= 2:   # 열린이
-                    score = 100
-                elif open_cnt >= 1: # 닫힌이
-                    score = 10
+        if self.mine == 'B':
+            alpha = 1
         else:
-            cnt_before = jump_idx - 1
-            cnt_after = len(data) - jump_idx - 2
-            if (cnt_before == 3 and cnt_after == 1) or (cnt_before == 1 and cnt_after == 3):
-                if open_cnt >= 2:   # 열린삼일
-                    score = 800
-                elif open_cnt >= 1: # 닫힌삼일
-                    score = 300
-            elif cnt_before == 2 and cnt_after == 2:
-                if open_cnt >= 2:   # 열린이이
-                    score = 500
-                elif open_cnt >= 1: # 닫힌이이
-                    score = 300
-            elif (cnt_before == 2 and cnt_after == 1) or (cnt_before == 1 and cnt_after == 2):
-                if open_cnt >= 2:   # 열린띈삼
-                    score = 300
-                elif open_cnt >= 1: # 닫힌띈삼
-                    score = 100
+            alpha = -1
+        
+        row_start = max(spot[0] - 4, 0)
+        row_end = min(spot[0] + 5, self.rows)
+        col_start = max(spot[1] - 4, 0)
+        col_end = min(spot[1] + 5, self.cols)
+        row_data = ''.join(self.board[row_start : row_end, spot[1]])
+        col_data = ''.join(self.board[spot[0], col_start : col_end])
+
+        diag_lu_data = ''.join([self.board[spot[0] + k][spot[1] + k] for k in range(-4, 5) if spot[0] + k >= 0 and spot[0] + k < self.rows and spot[1] + k >= 0 and spot[1] + k < self.cols])
+        diag_ld_data = ''.join([self.board[spot[0] - k][spot[1] + k] for k in range(-4, 5) if spot[0] - k >= 0 and spot[0] - k < self.rows and spot[1] + k >= 0 and spot[1] + k < self.cols])
+        line_data = [row_data, col_data, diag_ld_data, diag_lu_data]
+        line_data.append
+        for data in line_data:
+            if data.find('BBBBB') > 0 or data.find('.BBBB.') > 0:
+                score += 10000 * alpha
+            if data.find('WBBBB.') > 0 or data.find('.BBBBW') > 0 or data.find('.BBB.') > 0:
+                score += 1000 * alpha
+            if data.find('.BBB.B.') > 0 or data.find('.B.BBB.') > 0:
+                score += 800 * alpha
+            if data.find('.BB.BB.') > 0:
+                score += 500 * alpha
+            if data.find('WBBB.B.') > 0 or data.find('.BBB.BW') > 0 or data.find('WB.BBB.') > 0 or data.find('.B.BBBW') > 0:
+                score += 300 * alpha
+            if data.find('WBB.BB.') > 0 or data.find('.BB.BBW') > 0:
+                score += 300 * alpha
+            if data.find('WBB.BBW') > 0:
+                score += 300 * alpha
+            if data.find('.BB.B.') > 0 or data.find('.B.BB.') > 0:
+                score += 300 * alpha
+            if data.find('.BB.') > 0:
+                score += 200 * alpha
+            if data.find('WBB.B.') > 0 or data.find('.BB.BW') > 0 or data.find('WB.BB.') > 0 or data.find('.B.BBW') > 0:
+                score += 100 * alpha
+            if data.find('WBB.') > 0 or data.find('.BBW') > 0:
+                score += 10 * alpha
             
-        if ismine:
-            return score
-        else:
-            return score * -1
+            alpha *= -1
+            if data.find('WWWWW') > 0 or data.find('.WWWW.') > 0:
+                score += 10000 * alpha
+            if data.find('BWWWW.') > 0 or data.find('.WWWWB') > 0 or data.find('.WWW.') > 0:
+                score += 1000 * alpha
+            if data.find('.WWW.W.') > 0 or data.find('.W.WWW.') > 0:
+                score += 800 * alpha
+            if data.find('.WW.WW.') > 0:
+                score += 500 * alpha
+            if data.find('BWWW.W.') > 0 or data.find('.WWW.WB') > 0 or data.find('BW.WWW.') > 0 or data.find('.W.WWWB') > 0:
+                score += 300 * alpha
+            if data.find('BWW.WW.') > 0 or data.find('.WW.WWB') > 0:
+                score += 300 * alpha
+            if data.find('BWW.WWB') > 0:
+                score += 300 * alpha
+            if data.find('.WW.W.') > 0 or data.find('.W.WW.') > 0:
+                score += 300 * alpha
+            if data.find('.WW.') > 0:
+                score += 200 * alpha
+            if data.find('BWW.W.') > 0 or data.find('.WW.WB') > 0 or data.find('BW.WW.') > 0 or data.find('.W.WWB') > 0:
+                score += 100 * alpha
+            if data.find('BWW.') > 0 or data.find('.WWB') > 0:
+                score += 10 * alpha
 
-    def get_score_one_line(self, mine, start, delta):
-        score = 0
-        data = 'E'  # stands for End
-        now_color = None
-        i, j = start
-        while i >= 0 and i < self.rows and j >= 0 and j < self.cols:
-            if self.board[i][j] != self.__blank:
-                if now_color == None:
-                    now_color = self.board[i][j]
-                if now_color != self.board[i][j]:
-                    data += self.board[i][j]
-                    score += self.compute_score(data, now_color == mine)  # compute score
-                    data = '' + self.board[i - delta[0]][j - delta[1]]
-                    now_color=  self.board[i][j]
-
-            elif data[-1] == self.__blank:  # 2 blanks in a row
-                    score += self.compute_score(data, now_color == mine)  # compute score
-                    data = ''
-                    now_color = None
-            
-            data += self.board[i][j]
-            i += delta[0]
-            j += delta[1]
-        
+        self.score += score
+        self.score_change_stack.append(score)
         return score
-
-    def get_score(self, mine):
-        score = 0
-        
-        for i in range(self.rows):  # Horizontal
-            start = (i, 0)
-            delta = (0, 1)
-            score += self.get_score_one_line(mine, start, delta)
-        for i in range(self.cols):  # Vertical
-            start = (0, i)
-            delta = (1, 0)
-            score += self.get_score_one_line(mine, start, delta)
-        
-        for i in range(self.rows - 4):
-            start = (i, 0)
-            delta = (1, 1)
-            score += self.get_score_one_line(mine, start, delta)
-        for i in range(self.cols - 4):
-            start = (0, i)
-            delta = (1, 1)
-            score += self.get_score_one_line(mine, start, delta)
-        
-        for i in range(4, self.rows):
-            start = (i, 0)
-            delta = (-1, 1)
-            score += self.get_score_one_line(mine, start, delta)
-        for i in range(self.cols - 4):
-            start = (self.rows, i)
-            delta = (-1, 1)
-            score += self.get_score_one_line(mine, start, delta)
-        
-        return score
-
-    """
-    def getScore(self, color, enemy):
-        score = 0
-
-        # check Horizontal
-        for i in range(self.rows):
-            cnt_mine = 0
-            cnt_enemy = 0
-            for j in range(self.cols):
-                if self.board[i][j] == color:
-                    cnt_mine += 1
-                    if cnt_enemy > 0:
-                        if cnt_enemy >= 4:
-                            score -= 1000
-                        elif cnt_enemy >= 3:
-                            score -= 100
-                        cnt_enemy = 0
-                elif self.board[i][j] == enemy:
-                    cnt_enemy += 1
-                    if cnt_mine > 0:
-                        if cnt_mine >= 4:
-                            score += 1000
-                        elif cnt_mine >= 3:
-                            score += 100
-                        cnt_mine = 0
-                
-                if cnt_mine >= 5:
-                    score += 10000
-                    break
-                
-                if cnt_enemy >= 5:
-                    score -= 10000
-                    break
-        
-        #Debug
-        print("Horizontal Score:", score)
-        
-        # check Vertical
-        for j in range(self.cols):
-            cnt_mine = 0
-            cnt_enemy = 0
-            for i in range(self.rows):
-                if self.board[i][j] == color:
-                    cnt_mine += 1
-                    if cnt_enemy > 0:
-                        if cnt_enemy >= 4:
-                            score -= 1000
-                        elif cnt_enemy >= 3:
-                            score -= 100
-                        cnt_enemy = 0
-                elif self.board[i][j] == enemy:
-                    cnt_enemy += 1
-                    if cnt_mine > 0:
-                        if cnt_mine >= 4:
-                            score += 1000
-                        elif cnt_mine >= 3:
-                            score += 100
-                        cnt_mine = 0
-                
-                if cnt_mine >= 5:
-                    score += 10000
-                    break
-                
-                if cnt_enemy >= 5:
-                    score -= 10000
-                    break
-        
-        #Debug
-        print("Vertical Score:", score)
-        
-        # check Diagonal(From Left Up)
-        for row in range(self.rows - 4):
-            cnt_mine = 0
-            cnt_enemy = 0
-            for k in range(self.cols - row):
-                if self.board[row + k][k] == color:
-                    cnt_mine += 1
-                    if cnt_enemy > 0:
-                        if cnt_enemy >= 4:
-                            score -= 1000
-                        elif cnt_enemy >= 3:
-                            score -= 100
-                        cnt_enemy = 0
-                elif self.board[row + k][k] == enemy:
-                    cnt_enemy += 1
-                    if cnt_mine > 0:
-                        if cnt_mine >= 4:
-                            score += 1000
-                        elif cnt_mine >= 3:
-                            score += 100
-                        cnt_mine = 0
-                
-                if cnt_mine >= 5:
-                    score += 10000
-                    break
-                
-                if cnt_enemy >= 5:
-                    score -= 10000
-                    break
-
-        for col in range(1, self.cols - 4):
-            cnt_mine = 0
-            cnt_enemy = 0
-            for k in range(self.rows - col):
-                if self.board[k][col + k] == color:
-                    cnt_mine += 1
-                    if cnt_enemy > 0:
-                        if cnt_enemy >= 4:
-                            score -= 1000
-                        elif cnt_enemy >= 3:
-                            score -= 100
-                        cnt_enemy = 0
-                if self.board[k][col + k] == enemy:
-                    cnt_enemy += 1
-                    if cnt_mine > 0:
-                        if cnt_mine >= 4:
-                            score += 1000
-                        elif cnt_mine >= 3:
-                            score += 100
-                        cnt_mine = 0
-                
-                if cnt_mine >= 5:
-                    score += 10000
-                    break
-                
-                if cnt_enemy >= 5:
-                    score -= 10000
-                    break
-        
-        #Debug
-        print("Diagonal Left Up Score:", score)
-        
-        # check Diagonal(From Left Down)
-        for row in range(4, self.rows):
-            cnt_mine = 0
-            cnt_enemy = 0
-            for k in range(row + 1):
-                if self.board[row - k][k] == color: 
-                    cnt_mine += 1
-                    if cnt_enemy > 0:
-                        if cnt_enemy >= 4:
-                            score -= 1000
-                        elif cnt_enemy >= 3:
-                            score -= 100
-                        cnt_enemy = 0
-                elif self.board[row - k][k] == enemy:
-                    cnt_enemy += 1
-                    if cnt_mine > 0:
-                        if cnt_mine >= 4:
-                            score += 1000
-                        elif cnt_mine >= 3:
-                            score += 100
-                        cnt_mine = 0
-                
-                if cnt_mine >= 5:
-                    score += 10000
-                    break
-                
-                if cnt_enemy >= 5:
-                    score -= 10000
-                    break
-
-        for col in range(1, self.cols - 4):
-            cnt_mine = 0
-            cnt_enemy = 0
-            for k in range(self.rows - col):
-                if self.board[self.rows - k - 1][col + k] == color: 
-                    cnt_mine += 1
-                    if cnt_enemy > 0:
-                        if cnt_enemy >= 4:
-                            score -= 1000
-                        elif cnt_enemy >= 3:
-                            score -= 100
-                        cnt_enemy = 0
-                if self.board[self.rows - k - 1][col + k] == enemy: 
-                    cnt_enemy += 1
-                    if cnt_mine > 0:
-                        if cnt_mine >= 4:
-                            score += 1000
-                        elif cnt_mine >= 3:
-                            score += 100
-                        cnt_mine = 0
-                
-                if cnt_mine >= 5:
-                    score += 10000
-                    break
-                
-                if cnt_enemy >= 5:
-                    score -= 10000
-                    break
-        
-        #Debug
-        print("Diagonal Left Down Score:", score)
-        
-        return score
-        """
+    
+    def get_score(self):
+        return self.score
 
         
     def check_terminal(self, act):
@@ -485,24 +258,18 @@ class Minimax:
         return spot
 
 class AlphaBeta:
-    def __init__(self, rows, cols, color):
+    def __init__(self, rows, cols):
         self.rows = rows
         self.cols = cols
         self.__blank = '.'
 
-        self.my = color
         self.maxdepth = 2
-
-        if self.my == 'B':
-            self.enemy = 'W'
-        else:
-            self.enemy = 'B'
 
     def actions(self, state):
         return state.actions()
     
     def utility(self, state):
-        return state.get_score(self.my)
+        return state.get_score()
     
     def maxAgent(self, state, depth, alpha, beta):
         if depth >= self.maxdepth or state.terminal:
